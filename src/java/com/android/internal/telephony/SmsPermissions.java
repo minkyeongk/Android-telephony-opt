@@ -23,8 +23,10 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.Binder;
 import android.os.Build;
+import android.os.SystemClock;
 import android.os.UserHandle;
 import android.service.carrier.CarrierMessagingService;
+import android.util.ArrayMap;
 
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.telephony.util.TelephonyUtils;
@@ -36,12 +38,18 @@ import com.android.telephony.Rlog;
 public class SmsPermissions {
     static final String LOG_TAG = "SmsPermissions";
 
+    /** Rate-limit window: at most one successful SEND_SMS AppOps note per package per window. */
+    private static final long SEND_RATE_LIMIT_WINDOW_MS = 1000L; // 1 second
+
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.R, trackingBug = 170729553)
     private final Phone mPhone;
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.R, trackingBug = 170729553)
     private final Context mContext;
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.R, trackingBug = 170729553)
     private final AppOpsManager mAppOps;
+
+    /** Tracks the last time each package was allowed to send SMS, for rate-limiting. */
+    private final ArrayMap<String, Long> mLastSendAllowedMs = new ArrayMap<>();
 
     public SmsPermissions(Phone phone, Context context, AppOpsManager appOps) {
         mPhone = phone;
@@ -99,13 +107,30 @@ public class SmsPermissions {
      *
      * @throws SecurityException if the caller is missing the permission declaration or has had the
      *                           permission revoked at runtime.
-     * @return whether the caller has the OP_SEND_SMS AppOps bit.
+     * @return whether the caller has the OP_SEND_SMS AppOps bit and is within the rate limit.
      */
     public boolean checkCallingCanSendSms(String callingPackage, String callingAttributionTag,
             String message) {
         mContext.enforceCallingPermission(Manifest.permission.SEND_SMS, message);
-        return mAppOps.noteOp(AppOpsManager.OPSTR_SEND_SMS, Binder.getCallingUid(), callingPackage,
-                callingAttributionTag, null) == AppOpsManager.MODE_ALLOWED;
+
+        // Rate-limit: reject if the same package sent SMS within the window to prevent abuse.
+        final long nowMs = SystemClock.elapsedRealtime();
+        synchronized (mLastSendAllowedMs) {
+            Long lastMs = mLastSendAllowedMs.get(callingPackage);
+            if (lastMs != null && (nowMs - lastMs) < SEND_RATE_LIMIT_WINDOW_MS) {
+                Rlog.w(LOG_TAG, "checkCallingCanSendSms: rate limit hit for " + callingPackage);
+                return false;
+            }
+        }
+
+        boolean allowed = mAppOps.noteOp(AppOpsManager.OPSTR_SEND_SMS, Binder.getCallingUid(),
+                callingPackage, callingAttributionTag, null) == AppOpsManager.MODE_ALLOWED;
+        if (allowed) {
+            synchronized (mLastSendAllowedMs) {
+                mLastSendAllowedMs.put(callingPackage, nowMs);
+            }
+        }
+        return allowed;
     }
 
     /**

@@ -7,18 +7,23 @@ import android.content.pm.PackageManager;
 import android.ext.AppInfoExtFlag;
 import android.ext.PackageId;
 import android.os.UserHandle;
+import android.util.Log;
 
 import java.util.List;
 
 class InboundSmsHandlerExt {
+    private static final String TAG = "InboundSmsHandlerExt";
 
     @Nullable
     static List<String> processSmsRetrieverMatchedPackage(Context ctx, UserHandle user, String pkgName) {
+        Log.d(TAG, "processSmsRetrieverMatchedPackage: evaluating pkg=" + pkgName
+                + " for user=" + user);
         PackageManager pm = ctx.getPackageManager();
         ApplicationInfo appInfo;
         try {
             appInfo = pm.getApplicationInfoAsUser(pkgName, 0, user);
         } catch (PackageManager.NameNotFoundException e) {
+            Log.w(TAG, "processSmsRetrieverMatchedPackage: package not found: " + pkgName);
             return null;
         }
 
@@ -31,7 +36,12 @@ class InboundSmsHandlerExt {
                             PackageId.GMS_CORE_NAME) == PackageManager.PERMISSION_GRANTED) {
                         // GmsCompat: allow GmsCore to read SMS OTP of its clients if GmsCore has
                         // the SMS permission
+                        Log.i(TAG, "GmsCompat: routing OTP broadcast for " + pkgName
+                                + " through GmsCore (" + PackageId.GMS_CORE_NAME + ")");
                         return List.of(pkgName, PackageId.GMS_CORE_NAME);
+                    } else {
+                        Log.d(TAG, "GmsCompat: GmsCore lacks RECEIVE_SMS, not routing OTP for "
+                                + pkgName);
                     }
                 }
             } catch (PackageManager.NameNotFoundException ignored) {}

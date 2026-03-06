@@ -7,10 +7,12 @@ import android.content.pm.PackageManager;
 import android.ext.AppInfoExtFlag;
 import android.ext.PackageId;
 import android.os.UserHandle;
+import android.util.Log;
 
 import java.util.List;
 
 class InboundSmsHandlerExt {
+    private static final String TAG = "SmsHandlerExt";
 
     @Nullable
     static List<String> processSmsRetrieverMatchedPackage(Context ctx, UserHandle user, String pkgName) {
@@ -24,14 +26,23 @@ class InboundSmsHandlerExt {
 
         if (appInfo.ext().hasFlag(AppInfoExtFlag.HAS_GMSCORE_CLIENT_LIBRARY)) {
             try {
-                if (pm.getApplicationInfoAsUser(PackageId.GMS_CORE_NAME, 0, user)
-                        .ext().getPackageId() == PackageId.GMS_CORE) {
+                ApplicationInfo gcoreInfo =
+                        pm.getApplicationInfoAsUser(PackageId.GMS_CORE_NAME, 0, user);
+                if (gcoreInfo.ext().getPackageId() == PackageId.GMS_CORE) {
+                    boolean canReceive = pm.checkPermission(
+                            android.Manifest.permission.RECEIVE_SMS,
+                            PackageId.GMS_CORE_NAME) == PackageManager.PERMISSION_GRANTED;
+                    boolean canRead = pm.checkPermission(
+                            android.Manifest.permission.READ_SMS,
+                            PackageId.GMS_CORE_NAME) == PackageManager.PERMISSION_GRANTED;
 
-                    if (pm.checkPermission(android.Manifest.permission.RECEIVE_SMS,
-                            PackageId.GMS_CORE_NAME) == PackageManager.PERMISSION_GRANTED) {
-                        // GmsCompat: allow GmsCore to read SMS OTP of its clients if GmsCore has
-                        // the SMS permission
+                    if (canReceive && canRead) {
+                        // GmsCompat: require both RECEIVE_SMS and READ_SMS before allowing
+                        // GmsCore to intercept OTP broadcasts on behalf of its clients
                         return List.of(pkgName, PackageId.GMS_CORE_NAME);
+                    } else {
+                        Log.w(TAG, "GmsCore missing required SMS permissions (receive="
+                                + canReceive + " read=" + canRead + "), skipping OTP forward");
                     }
                 }
             } catch (PackageManager.NameNotFoundException ignored) {}

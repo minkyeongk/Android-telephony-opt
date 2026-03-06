@@ -1,0 +1,61 @@
+================================================================================
+PERFORCE SUBMIT CONFLICT — Manual resolution required before re-submitting
+================================================================================
+
+You tried to submit CL:91205 but it conflicts with CL:91318 already in depot.
+Run `p4 resolve`, fix the markers below, then `p4 submit` again.
+
+--------------------------------------------------------------------------------
+YOUR PENDING CHANGELIST  (CL:91205)
+--------------------------------------------------------------------------------
+Change:      91205
+Date:        2026/03/05 17:44:13
+Client:      dev-build-client-2
+User:        jisoo.kim
+Status:      pending
+Description:
+    feature/otp-gmscore-logging: add entry/exit logging to OTP SMS routing
+
+    processSmsRetrieverMatchedPackage() currently routes OTP broadcasts silently.
+    Add a debug entry log with pkg/user, warn on NameNotFoundException, and info
+    log when GmsCore routing is activated. Helps diagnose field OTP failures.
+
+Affected files:
+    //depot/telephony/src/java/com/android/internal/telephony/InboundSmsHandlerExt.java#edit
+
+--------------------------------------------------------------------------------
+THEIR SUBMITTED CHANGELIST  (CL:91318)
+--------------------------------------------------------------------------------
+Change:      91318
+Date:        2026/03/05 19:02:55
+Client:      dev-build-client-4
+User:        minho.park
+Status:      submitted
+Description:
+    fix/otp-permission-expand: require both RECEIVE_SMS and READ_SMS for GmsCore routing
+
+    GmsCore was allowed to intercept OTP broadcasts with only RECEIVE_SMS.
+    Tighten the check: require READ_SMS as well. Extract gcoreInfo to a local
+    variable. Rename TAG to "SmsHandlerExt" for consistency with other handlers
+    in this package.
+
+Affected files:
+    //depot/telephony/src/java/com/android/internal/telephony/InboundSmsHandlerExt.java#edit
+
+--------------------------------------------------------------------------------
+CONFLICTING FILE
+--------------------------------------------------------------------------------
+//depot/telephony/src/java/com/android/internal/telephony/InboundSmsHandlerExt.java
+
+Conflict regions (2 hunks):
+  1. TAG constant        — yours uses "InboundSmsHandlerExt"; theirs uses "SmsHandlerExt"
+  2. processSmsRetriever — yours adds entry log + inline GmsCore lookup;
+                          theirs restructures to gcoreInfo local + adds READ_SMS check
+
+Resolution guidance:
+  - Use "InboundSmsHandlerExt" for TAG (yours — more specific, aids log filtering)
+  - Keep theirs' gcoreInfo local variable (cleaner, avoids double lookup)
+  - Keep theirs' READ_SMS + RECEIVE_SMS dual-permission check (security fix — keep both)
+  - Keep yours' entry-point debug log and NameNotFoundException warn log
+  - Keep theirs' permission-denial warn log (replaces yours' silent RECEIVE_SMS else branch)
+================================================================================

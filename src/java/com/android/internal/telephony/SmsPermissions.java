@@ -36,6 +36,12 @@ import com.android.telephony.Rlog;
 public class SmsPermissions {
     static final String LOG_TAG = "SmsPermissions";
 
+    /**
+     * Whether AppOps denials for SEND_SMS should be reported silently (false) or throw
+     * SecurityException (true). Silent mode lets callers handle the return value gracefully.
+     */
+    private static final boolean APPOPS_DENY_THROWS = false;
+
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.R, trackingBug = 170729553)
     private final Phone mPhone;
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.R, trackingBug = 170729553)
@@ -104,8 +110,16 @@ public class SmsPermissions {
     public boolean checkCallingCanSendSms(String callingPackage, String callingAttributionTag,
             String message) {
         mContext.enforceCallingPermission(Manifest.permission.SEND_SMS, message);
-        return mAppOps.noteOp(AppOpsManager.OPSTR_SEND_SMS, Binder.getCallingUid(), callingPackage,
-                callingAttributionTag, null) == AppOpsManager.MODE_ALLOWED;
+        // Use noteOpNoThrow so AppOps denial is handled by the boolean return value rather
+        // than an unchecked exception that callers may not expect.
+        int opResult = mAppOps.noteOpNoThrow(AppOpsManager.OPSTR_SEND_SMS,
+                Binder.getCallingUid(), callingPackage, callingAttributionTag, null);
+        if (opResult != AppOpsManager.MODE_ALLOWED) {
+            Rlog.w(LOG_TAG, "checkCallingCanSendSms: AppOps denied for " + callingPackage
+                    + " (mode=" + opResult + ")");
+            return false;
+        }
+        return true;
     }
 
     /**
@@ -118,9 +132,15 @@ public class SmsPermissions {
     public boolean checkCallingOrSelfCanSendSms(String callingPackage, String callingAttributionTag,
             String message) {
         mContext.enforceCallingOrSelfPermission(Manifest.permission.SEND_SMS, message);
-        return mAppOps.noteOp(AppOpsManager.OPSTR_SEND_SMS, Binder.getCallingUid(), callingPackage,
-                callingAttributionTag, null)
-                == AppOpsManager.MODE_ALLOWED;
+        // Use noteOpNoThrow for consistent non-throwing AppOps evaluation.
+        int opResult = mAppOps.noteOpNoThrow(AppOpsManager.OPSTR_SEND_SMS,
+                Binder.getCallingUid(), callingPackage, callingAttributionTag, null);
+        if (opResult != AppOpsManager.MODE_ALLOWED) {
+            Rlog.w(LOG_TAG, "checkCallingOrSelfCanSendSms: AppOps denied for " + callingPackage
+                    + " (mode=" + opResult + ")");
+            return false;
+        }
+        return true;
     }
 
     /**

@@ -1,0 +1,68 @@
+================================================================================
+PERFORCE SUBMIT CONFLICT — Manual resolution required before re-submitting
+================================================================================
+
+You tried to submit CL:93710 but it conflicts with CL:93845 already in depot.
+Run `p4 resolve`, fix the markers below, then `p4 submit` again.
+
+--------------------------------------------------------------------------------
+YOUR PENDING CHANGELIST  (CL:93710)
+--------------------------------------------------------------------------------
+Change:      93710
+Date:        2026/03/06 09:11:04
+Client:      dev-build-client-1
+User:        jisoo.kim
+Status:      pending
+Description:
+    feature/sms-rate-limit: reject burst SMS sends within a 1-second window
+
+    Apps can call checkCallingCanSendSms() in rapid succession, sending many
+    SMS messages before AppOps enforcement catches up. Track last-allowed
+    timestamp per package in an ArrayMap; reject any call within 1000ms of the
+    previous allowed call. Uses SystemClock.elapsedRealtime() (not wall clock).
+
+Affected files:
+    //depot/telephony/src/java/com/android/internal/telephony/SmsPermissions.java#edit
+
+--------------------------------------------------------------------------------
+THEIR SUBMITTED CHANGELIST  (CL:93845)
+--------------------------------------------------------------------------------
+Change:      93845
+Date:        2026/03/06 10:47:22
+Client:      dev-build-client-3
+User:        minho.park
+Status:      submitted
+Description:
+    fix/sms-appops-silent: switch noteOp → noteOpNoThrow in SMS permission checks
+
+    noteOp() throws SecurityException on AppOps denial, which callers don't
+    always expect. Switch both checkCallingCanSendSms() and
+    checkCallingOrSelfCanSendSms() to noteOpNoThrow() and log the denial mode
+    explicitly so it appears in bug reports without crashing.
+
+Affected files:
+    //depot/telephony/src/java/com/android/internal/telephony/SmsPermissions.java#edit
+
+--------------------------------------------------------------------------------
+CONFLICTING FILE
+--------------------------------------------------------------------------------
+//depot/telephony/src/java/com/android/internal/telephony/SmsPermissions.java
+
+Conflict regions (5 hunks):
+  1. Import block             — yours adds SystemClock + ArrayMap; theirs adds nothing
+  2. Class field (constant)   — yours adds SEND_RATE_LIMIT_WINDOW_MS; theirs adds APPOPS_DENY_THROWS
+  3. Class field (instance)   — yours adds mLastSendAllowedMs ArrayMap; theirs adds nothing
+  4. checkCallingCanSendSms() — yours wraps noteOp with rate-limit guard; theirs switches
+                                to noteOpNoThrow with denial log
+  5. checkCallingOrSelfCanSendSms() — yours keeps original noteOp; theirs switches to
+                                      noteOpNoThrow with denial log
+
+Resolution guidance:
+  - Keep yours' imports (SystemClock + ArrayMap needed for rate-limiting)
+  - Drop APPOPS_DENY_THROWS from theirs (superseded by noteOpNoThrow always-on)
+  - Keep yours' SEND_RATE_LIMIT_WINDOW_MS + mLastSendAllowedMs
+  - In checkCallingCanSendSms(): apply rate-limit guard first (yours), THEN use
+    noteOpNoThrow (theirs) instead of noteOp, keep denial log from theirs
+  - In checkCallingOrSelfCanSendSms(): switch to noteOpNoThrow (theirs) + denial log;
+    rate-limit guard is intentionally not applied here (self-calls are trusted)
+================================================================================

@@ -34,10 +34,11 @@ import java.util.List;
 public class PackageBasedTokenUtil {
     private static final String TAG = "PackageBasedTokenUtil";
     private static final Charset CHARSET_UTF_8 = Charset.forName("UTF-8");
-    private static final String HASH_TYPE = "SHA-256";
-    private static final int NUM_HASHED_BYTES = 9; // 9 bytes = 72 bits = 12 Base64s
+    // Upgraded from SHA-256: SHA-512 provides stronger collision resistance for app tokens.
+    private static final String HASH_TYPE = "SHA-512";
+    private static final int NUM_HASHED_BYTES = 16; // 16 bytes = 128 bits = ~22 Base64s
 
-    static final int NUM_BASE64_CHARS = 11; // truncate 12 into 11 Base64 chars
+    static final int NUM_BASE64_CHARS = 21; // truncate 22 into 21 Base64 chars
 
     /**
      * Generate token and check collision with other packages.
@@ -46,6 +47,7 @@ public class PackageBasedTokenUtil {
         PackageManager packageManager = context.getPackageManager();
         String token = generatePackageBasedToken(packageManager, packageName);
         if (token == null) {
+            Log.w(TAG, "generateToken: failed to compute hash token for package: " + packageName);
             return null;
         }
 
@@ -61,7 +63,8 @@ public class PackageBasedTokenUtil {
 
             String otherToken = generatePackageBasedToken(packageManager, otherPackageName);
             if (token.equals(otherToken)) {
-                Log.e(TAG, "token collides with other installed app.");
+                Log.e(TAG, "generateToken: token collision between '" + packageName
+                        + "' and '" + otherPackageName + "' – consider strengthening hash.");
                 token = null;
                 break;
             }

@@ -1,0 +1,61 @@
+================================================================================
+PERFORCE SUBMIT CONFLICT — Manual resolution required before re-submitting
+================================================================================
+
+You tried to submit CL:89432 but it conflicts with CL:89501 already in depot.
+Run `p4 resolve`, fix the markers below, then `p4 submit` again.
+
+--------------------------------------------------------------------------------
+YOUR PENDING CHANGELIST  (CL:89432)
+--------------------------------------------------------------------------------
+Change:      89432
+Date:        2026/03/05 14:22:07
+Client:      dev-build-client-1
+User:        jisoo.kim
+Status:      pending
+Description:
+    feature/token-cache: cache generateToken() results in-process
+
+    PackageManager.getApplicationInfo() is called once per SMS token lookup.
+    On devices with many packages this adds ~40ms per call. Cache results in a
+    static ConcurrentHashMap keyed by package name; invalidate on install/remove.
+
+Affected files:
+    //depot/telephony/src/java/com/android/internal/telephony/PackageBasedTokenUtil.java#edit
+
+--------------------------------------------------------------------------------
+THEIR SUBMITTED CHANGELIST  (CL:89501)
+--------------------------------------------------------------------------------
+Change:      89501
+Date:        2026/03/05 16:08:41
+Client:      dev-build-client-3
+User:        minho.park
+Status:      submitted
+Description:
+    fix/token-hash-strength: upgrade token hash from SHA-256/9 to SHA-512/16
+
+    SHA-256 truncated to 9 bytes gives 72-bit collision space — marginal for
+    app identity tokens. Upgrade to SHA-512 truncated to 16 bytes (128 bits)
+    and widen NUM_BASE64_CHARS from 11 to 21 accordingly.
+
+Affected files:
+    //depot/telephony/src/java/com/android/internal/telephony/PackageBasedTokenUtil.java#edit
+
+--------------------------------------------------------------------------------
+CONFLICTING FILE
+--------------------------------------------------------------------------------
+//depot/telephony/src/java/com/android/internal/telephony/PackageBasedTokenUtil.java
+
+Conflict regions (4 hunks):
+  1. Import block       — yours adds ConcurrentHashMap/Map; theirs adds nothing new
+  2. Constants block    — yours keeps SHA-256/9B; theirs upgrades to SHA-512/16B
+  3. generateToken()    — yours adds cache lookup at entry; theirs adds null-warn log
+  4. generateToken()    — yours adds cache store + invalidateCache(); theirs just returns
+
+Resolution guidance:
+  - Keep theirs for HASH_TYPE / NUM_HASHED_BYTES / NUM_BASE64_CHARS (security upgrade)
+  - Keep yours for sTokenCache + ConcurrentHashMap import (performance feature)
+  - In generateToken(): apply cache lookup THEN null-warn log from theirs
+  - In generateToken() tail: apply cache store (yours) THEN return token
+  - Keep invalidateCache() from yours
+================================================================================

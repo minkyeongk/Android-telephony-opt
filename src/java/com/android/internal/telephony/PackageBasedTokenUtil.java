@@ -29,25 +29,56 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.List;
+<<<<<<< yours:PackageBasedTokenUtil.java (CL:89432 feature/token-cache)
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+=======
+>>>>>>> theirs:PackageBasedTokenUtil.java (CL:89501 fix/token-hash-strength)
 
 /** Utility class for generating token, i.e., hash of package name and certificate. */
 public class PackageBasedTokenUtil {
     private static final String TAG = "PackageBasedTokenUtil";
     private static final Charset CHARSET_UTF_8 = Charset.forName("UTF-8");
+<<<<<<< yours:PackageBasedTokenUtil.java (CL:89432 feature/token-cache)
     private static final String HASH_TYPE = "SHA-256";
     private static final int NUM_HASHED_BYTES = 9; // 9 bytes = 72 bits = 12 Base64s
 
     static final int NUM_BASE64_CHARS = 11; // truncate 12 into 11 Base64 chars
 
+    /** Cache previously computed tokens to avoid repeated PackageManager queries. */
+    private static final Map<String, String> sTokenCache = new ConcurrentHashMap<>();
+=======
+    // Upgraded from SHA-256: stronger collision resistance for app identity tokens.
+    private static final String HASH_TYPE = "SHA-512";
+    private static final int NUM_HASHED_BYTES = 16; // 16 bytes = 128 bits = ~22 Base64s
+
+    static final int NUM_BASE64_CHARS = 21; // truncate 22 into 21 Base64 chars
+>>>>>>> theirs:PackageBasedTokenUtil.java (CL:89501 fix/token-hash-strength)
+
     /**
      * Generate token and check collision with other packages.
      */
     public static String generateToken(Context context, String packageName) {
+<<<<<<< yours:PackageBasedTokenUtil.java (CL:89432 feature/token-cache)
+        // Return cached token if available; PackageManager lookups are expensive.
+        String cached = sTokenCache.get(packageName);
+        if (cached != null) {
+            return cached;
+        }
+
         PackageManager packageManager = context.getPackageManager();
         String token = generatePackageBasedToken(packageManager, packageName);
         if (token == null) {
             return null;
         }
+=======
+        PackageManager packageManager = context.getPackageManager();
+        String token = generatePackageBasedToken(packageManager, packageName);
+        if (token == null) {
+            Log.w(TAG, "generateToken: failed to generate token for " + packageName);
+            return null;
+        }
+>>>>>>> theirs:PackageBasedTokenUtil.java (CL:89501 fix/token-hash-strength)
 
         // Check for token confliction
         List<PackageInfo> packages =
@@ -61,14 +92,33 @@ public class PackageBasedTokenUtil {
 
             String otherToken = generatePackageBasedToken(packageManager, otherPackageName);
             if (token.equals(otherToken)) {
-                Log.e(TAG, "token collides with other installed app.");
+<<<<<<< yours:PackageBasedTokenUtil.java (CL:89432 feature/token-cache)
+                Log.e(TAG, "generateToken: collision detected, discarding token for "
+                        + packageName);
+=======
+                Log.e(TAG, "generateToken: collision between '" + packageName
+                        + "' and '" + otherPackageName + "'");
+>>>>>>> theirs:PackageBasedTokenUtil.java (CL:89501 fix/token-hash-strength)
                 token = null;
                 break;
             }
         }
 
+<<<<<<< yours:PackageBasedTokenUtil.java (CL:89432 feature/token-cache)
+        if (token != null) {
+            sTokenCache.put(packageName, token);
+        }
         return token;
     }
+
+    /** Invalidates the token cache (call after package install/uninstall). */
+    public static void invalidateCache() {
+        sTokenCache.clear();
+    }
+=======
+        return token;
+    }
+>>>>>>> theirs:PackageBasedTokenUtil.java (CL:89501 fix/token-hash-strength)
 
     /**
      * Generates a package-based token.

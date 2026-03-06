@@ -29,6 +29,8 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /** Utility class for generating token, i.e., hash of package name and certificate. */
 public class PackageBasedTokenUtil {
@@ -40,9 +42,21 @@ public class PackageBasedTokenUtil {
     static final int NUM_BASE64_CHARS = 11; // truncate 12 into 11 Base64 chars
 
     /**
+     * Cache of previously generated tokens keyed by package name.
+     * Avoids repeated expensive crypto operations for the same package.
+     */
+    private static final Map<String, String> sTokenCache = new ConcurrentHashMap<>();
+
+    /**
      * Generate token and check collision with other packages.
      */
     public static String generateToken(Context context, String packageName) {
+        // Return cached token if available to avoid repeated expensive computation.
+        String cachedToken = sTokenCache.get(packageName);
+        if (cachedToken != null) {
+            return cachedToken;
+        }
+
         PackageManager packageManager = context.getPackageManager();
         String token = generatePackageBasedToken(packageManager, packageName);
         if (token == null) {
@@ -67,7 +81,16 @@ public class PackageBasedTokenUtil {
             }
         }
 
+        if (token != null) {
+            // Cache the result to speed up future lookups for the same package.
+            sTokenCache.put(packageName, token);
+        }
         return token;
+    }
+
+    /** Clears the token cache, e.g. after package install/uninstall events. */
+    public static void clearTokenCache() {
+        sTokenCache.clear();
     }
 
     /**

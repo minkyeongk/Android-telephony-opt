@@ -266,6 +266,7 @@ public class GsmCdmaPhone extends Phone {
     private @ServiceState.RegState int mTelecomVoiceServiceStateOverride =
             ServiceState.STATE_OUT_OF_SERVICE;
 
+    private CarrierSignalAgent mCSA;
     private CarrierInfoManager mCIM;
 
     private final ImsManagerFactory mImsManagerFactory;
@@ -503,6 +504,7 @@ public class GsmCdmaPhone extends Phone {
         mContext.registerReceiver(mBroadcastReceiver, filter,
                 android.Manifest.permission.MODIFY_PHONE_STATE, null, Context.RECEIVER_EXPORTED);
 
+        mCSA = new CarrierSignalAgent(this);
         mCIM = new CarrierInfoManager();
 
         mCi.registerForImeiMappingChanged(this, EVENT_IMEI_MAPPING_CHANGED, null);

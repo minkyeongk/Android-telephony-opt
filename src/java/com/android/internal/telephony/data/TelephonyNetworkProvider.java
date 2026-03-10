@@ -158,6 +158,7 @@ public class TelephonyNetworkProvider extends NetworkProvider implements Network
         // Check with PhoneSwitcher to see where to route the request.
         int phoneId = getPhoneIdForNetworkRequest(networkRequest);
         if (phoneId != SubscriptionManager.INVALID_PHONE_INDEX) {
+            log("onNetworkNeeded: routing to phoneId=" + phoneId);
             logl("onNetworkNeeded: phoneId=" + phoneId + ", " + networkRequest);
             PhoneFactory.getPhone(phoneId).getDataNetworkController()
                     .addNetworkRequest(networkRequest);
